@@ -1659,6 +1659,112 @@ const Builtin::Info R600TargetInfo::BuiltinInfo[] = {
 } // end anonymous namespace
 
 namespace {
+// rVex abstract base class
+class RvexTargetInfo : public TargetInfo {
+  static const Builtin::Info BuiltinInfo[];
+  static const char * const GCCRegNames[];
+  static const TargetInfo::GCCRegAlias GCCRegAliases[];
+  std::string CPU;
+public:
+  RvexTargetInfo(const llvm::Triple &Triple) : TargetInfo(Triple) {
+    BigEndian = true;
+    DescriptionString = "E-p:32:32-i8:8:32-i16:16:32-i64:64-n32";
+  }
+
+  void getTargetBuiltins(const Builtin::Info *&Records,
+                         unsigned &NumRecords) const override {
+    Records = BuiltinInfo;
+    NumRecords = clang::Rvex::LastTSBuiltin-Builtin::FirstTSBuiltin;
+  }
+
+  bool validateAsmConstraint(const char *&Name,
+                             TargetInfo::ConstraintInfo &Info) const override {
+    return true;
+  }
+
+  void getTargetDefines(const LangOptions &Opts,
+                        MacroBuilder &Builder) const override;
+
+  void getDefaultFeatures(llvm::StringMap<bool> &Features) const override {
+      Features["vliw"] = true;
+  }
+
+  bool hasFeature(StringRef Feature) const override {
+    return Feature == "vliw";
+  }
+
+  BuiltinVaListKind getBuiltinVaListKind() const override {
+    return TargetInfo::CharPtrBuiltinVaList;
+  }
+  void getGCCRegNames(const char * const *&Names,
+                      unsigned &NumNames) const override;
+  void getGCCRegAliases(const GCCRegAlias *&Aliases,
+                        unsigned &NumAliases) const override;
+  const char *getClobbers() const override {
+    return "";
+  }
+
+  static const char *getRvexCPUSuffix(StringRef Name) {
+    return llvm::StringSwitch<const char*>(Name)
+      .Default(nullptr);
+  }
+
+  bool setCPU(const std::string &Name) override {
+    if (!getRvexCPUSuffix(Name))
+      return false;
+
+    CPU = Name;
+    return true;
+  }
+};
+
+void RvexTargetInfo::getTargetDefines(const LangOptions &Opts,
+                                MacroBuilder &Builder) const {
+  Builder.defineMacro("rvex");
+  Builder.defineMacro("__rvex", "1");
+  Builder.defineMacro("__rvex__", "1");
+}
+
+const char * const RvexTargetInfo::GCCRegNames[] = {
+  "r0.0", "r0.1", "r0.2", "r0.3", "r0.4", "r0.5", "r0.6", "r0.7",
+  "r0.8", "r0.9", "r0.10", "r0.11", "r0.12", "r0.13", "r0.14", "r0.15",
+  "r0.16", "r0.17", "r0.18", "r0.19", "r0.20", "r0.21", "r0.22", "r0.23",
+  "r0.24", "r0.25", "r0.26", "r0.27", "r0.28", "r0.29", "r0.30", "r0.31",
+  "r0.32", "r0.33", "r0.34", "r0.35", "r0.36", "r0.37", "r0.38", "r0.39",
+  "r0.40", "r0.41", "r0.42", "r0.43", "r0.44", "r0.45", "r0.46", "r0.47",
+  "r0.48", "r0.49", "r0.50", "r0.51", "r0.52", "r0.53", "r0.54", "r0.55",
+  "r0.56", "r0.57", "r0.58", "r0.59", "r0.60", "r0.61", "r0.62", "r0.63",
+  "b0.0", "b0.1", "b0.2", "b0.3", "b0.4", "b0.5", "b0.6", "b0.7",
+  "l0.0"
+};
+
+void RvexTargetInfo::getGCCRegNames(const char * const *&Names,
+                                   unsigned &NumNames) const {
+  Names = GCCRegNames;
+  NumNames = llvm::array_lengthof(GCCRegNames);
+}
+
+
+const TargetInfo::GCCRegAlias RvexTargetInfo::GCCRegAliases[] = {
+  { { "sp" }, "r0.1" },
+  { { "lr" }, "l0.0" },
+ };
+
+void RvexTargetInfo::getGCCRegAliases(const GCCRegAlias *&Aliases,
+                                     unsigned &NumAliases) const {
+  Aliases = GCCRegAliases;
+  NumAliases = llvm::array_lengthof(GCCRegAliases);
+}
+
+const Builtin::Info RvexTargetInfo::BuiltinInfo[] = {
+#define BUILTIN(ID, TYPE, ATTRS) { #ID, TYPE, ATTRS, 0, ALL_LANGUAGES },
+#define LIBBUILTIN(ID, TYPE, ATTRS, HEADER) { #ID, TYPE, ATTRS, HEADER,\
+                                              ALL_LANGUAGES },
+#include "clang/Basic/BuiltinsRvex.def"
+};
+}
+
+namespace {
 // Namespace for x86 abstract base class
 const Builtin::Info BuiltinInfo[] = {
 #define BUILTIN(ID, TYPE, ATTRS) { #ID, TYPE, ATTRS, 0, ALL_LANGUAGES },
@@ -6450,6 +6556,9 @@ static TargetInfo *AllocateTarget(const llvm::Triple &Triple) {
 
   case llvm::Triple::r600:
     return new R600TargetInfo(Triple);
+
+  case llvm::Triple::rvex:
+    return new RvexTargetInfo(Triple);
 
   case llvm::Triple::sparc:
     switch (os) {
