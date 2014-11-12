@@ -82,6 +82,16 @@ namespace clang {
   };
   }
 
+  /// \brief r-Vex builtins
+  namespace Rvex {
+  enum {
+    LastTIBuiltin = clang::Builtin::FirstTSBuiltin - 1,
+  #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
+  #include "clang/Basic/BuiltinsRvex.def"
+    LastTSBuiltin
+  };
+  }
+
   /// \brief X86 builtins
   namespace X86 {
     enum {
