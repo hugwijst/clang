@@ -1748,8 +1748,9 @@ public:
     return "";
   }
 
-  static const char *getRvexCPUSuffix(StringRef Name) {
-    return llvm::StringSwitch<const char*>(Name)
+  static bool getRvexCPUSuffix(StringRef Name) {
+    return llvm::StringSwitch<bool>(Name)
+      .Case("rvex-vliw", true)
       .Default(nullptr);
   }
 
